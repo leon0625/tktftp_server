@@ -52,6 +52,7 @@ class TFTPServerApp:
         self.path_combo = ttk.Combobox(self.frame, textvariable=self.path_var)
         self.path_combo.grid(column=1, row=0, padx=5, pady=5, sticky='ew')
         self.path_combo.bind('<<ComboboxSelected>>', self.on_path_change)
+        self.path_combo.bind('<Button-1>', self.show_dropdown)
 
         self.browse_button = ttk.Button(self.frame, text="Browse", command=self.browse)
         self.browse_button.grid(column=2, row=0, padx=5, pady=5)
@@ -135,10 +136,15 @@ class TFTPServerApp:
 
     def on_path_change(self, event):
         new_path = self.path_var.get()
+        if new_path == self.current_directory:
+            return
         # self.log(f"Changing working directory to: {new_path}")
         self.restart_server(new_path)
         self.update_history(new_path)
         self.update_path_combo()
+
+    def show_dropdown(self, event):
+        self.path_combo.event_generate('<Down>')
 
     def browse(self):
         directory = filedialog.askdirectory()
