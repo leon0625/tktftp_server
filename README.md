@@ -1,2 +1,4 @@
-# tktftp_server
-python3 tkinter tftp server
+# tktftp_server  
+python3 tkinter tftp server  
+
+![](./windows.png)
