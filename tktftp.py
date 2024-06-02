@@ -1,4 +1,4 @@
-import os
+import os,sys
 import json
 import time
 import multiprocessing
@@ -6,6 +6,13 @@ import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext
 import logging
 import mytftpy as tftpy
+from PIL import Image, ImageTk
+
+# 获取应用运行时的临时目录路径
+if getattr(sys, 'frozen', False):
+    application_path = sys._MEIPASS
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
 
 class TFTPServerApp:
     HISTORY_FILE = "history.json"
@@ -41,6 +48,12 @@ class TFTPServerApp:
         position_right = int(screen_width / 2 - window_width / 2)
 
         self.root.geometry(f"{window_width}x{window_height}+{position_right}+{position_top}")
+
+        # 图标
+        icon_path = os.path.join(application_path, "icon.png")
+        img = Image.open(icon_path)
+        photo = ImageTk.PhotoImage(img)
+        root.iconphoto(True, photo)  # 在这里设置窗口和任务栏图标
 
         self.frame = ttk.Frame(self.root)
         self.frame.grid(column=0, row=0, padx=10, pady=10, sticky='ew')
