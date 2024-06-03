@@ -21,3 +21,4 @@ tftpy.egg-info
 # PyCharm
 .idea/
 coverage.xml
+*.spec

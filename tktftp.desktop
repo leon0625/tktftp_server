@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=TFTP server 
+Comment=测试工具
+Type=Application
+Path=/APP/tktftp
+Exec=pkexec /APP/tktftp/tktftp
+Icon=/APP/tktftp/icon.png
+Terminal=false
