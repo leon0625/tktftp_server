@@ -2,6 +2,7 @@ import os,sys
 import json
 import time
 import multiprocessing
+import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext
 import logging
@@ -35,7 +36,7 @@ class TFTPServerApp:
         self.start_server(self.current_directory)
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        self.root.after(100, self.process_log_queue)  # Check the log queue periodically
+        threading.Thread(target=self.process_log_queue, daemon=True).start()
 
     def setup_ui(self):
         window_width = 800
@@ -93,6 +94,9 @@ class TFTPServerApp:
         if os.path.exists(self.HISTORY_FILE):
             with open(self.HISTORY_FILE, 'r') as file:
                 history = json.load(file)
+            for path in list(history.keys()):
+                if not os.path.exists(path):
+                    del history[path]
             # Sort by timestamp (value of the dict)
             return dict(sorted(history.items(), key=lambda item: item[1], reverse=True))
         return {self.current_directory: time.time()}
@@ -160,7 +164,7 @@ class TFTPServerApp:
         self.path_combo.event_generate('<Down>')
 
     def browse(self):
-        directory = filedialog.askdirectory()
+        directory = filedialog.askdirectory(initialdir=self.current_directory)
         if directory:
             self.current_directory = directory
             self.restart_server(directory)
@@ -180,10 +184,9 @@ class TFTPServerApp:
         self.root.destroy()
 
     def process_log_queue(self):
-        while not self.log_queue.empty():
+        while True:
             record = self.log_queue.get()
             self.logger.handle(record)
-        self.root.after(100, self.process_log_queue)
 
 class QueueHandler(logging.Handler):
     def __init__(self, log_queue):

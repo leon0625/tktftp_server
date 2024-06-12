@@ -319,7 +319,8 @@ class TftpStateServerRecvRRQ(TftpServerState):
         sendoack = self.serverInitial(pkt, raddress, rport)
         path = self.full_path
         log.info("Opening file %s for reading" % path)
-        mylog.info(f"{raddress}:{rport} GET {path}")
+        relpath = os.path.relpath(path, start=self.context.root) # relative path
+        mylog.info(f"{raddress}:{rport} GET {relpath}")
         if os.path.exists(path):
             # Note: Open in binary mode for win32 portability, since win32
             # blows.
@@ -336,7 +337,7 @@ class TftpStateServerRecvRRQ(TftpServerState):
                 raise TftpException("File not found: %s" % path)
         else:
             log.warning("File not found: %s", path)
-            mylog.warning("File not found: %s", path)
+            mylog.warning("File not found: %s", relpath)
             self.sendError(TftpErrors.FileNotFound)
             raise TftpException(f"File not found: {path}")
 
@@ -405,7 +406,8 @@ class TftpStateServerRecvWRQ(TftpServerState):
                 self.context.fileobj = f
         else:
             log.info("Opening file %s for writing" % path)
-            mylog.info(f"{raddress}:{rport} PUT {path}")
+            relpath = os.path.relpath(path, start=self.context.root) # relative path
+            mylog.info(f"{raddress}:{rport} PUT {relpath}")
             if os.path.exists(path):
                 # FIXME: correct behavior?
                 log.warning(

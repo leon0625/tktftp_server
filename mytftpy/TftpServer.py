@@ -264,7 +264,7 @@ class TftpServer(TftpSession):
                     log.debug("Deleting session %s" % key)
                     del self.sessions[key]
                     log.debug("Session list is now %s" % self.sessions)
-                    # mylog.info(f'complete, Transferred {metrics.bytes} bytes')
+                    mylog.info(f'Transferred {metrics.bytes} bytes, Average rate: {metrics.kbps/8:.2f} kBps')
                 else:
                     log.warning("Strange, session %s is not on the deletion list" % key)
 
