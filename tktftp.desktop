@@ -7,4 +7,4 @@ Exec=pkexec /APP/tktftp/tktftp
 Icon=/APP/tktftp/icon.png
 Terminal=false
 # 修复24.04图标不显示问题
-StartupWMClass=tk
+StartupWMClass=tftp

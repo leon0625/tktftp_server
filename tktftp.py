@@ -212,6 +212,6 @@ class TextHandler(logging.Handler):
         self.root.after(0, append)
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = tk.Tk(className="tftp")
     app = TFTPServerApp(root)
     root.mainloop()
