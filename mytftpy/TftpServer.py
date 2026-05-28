@@ -148,6 +148,9 @@ class TftpServer(TftpSession):
                 else:
                     raise
 
+            if self.shutdown_immediately:
+                continue
+
             deletion_list = []
 
             # Handle the available data, if any. Maybe we timed-out.
@@ -188,6 +191,8 @@ class TftpServer(TftpSession):
                         except TftpTimeoutExpectACK:
                             self.sessions[key].timeout_expectACK = True
                         except TftpException as err:
+                            self.sessions[key].failed = True
+                            self.sessions[key].emit_event("error", error=str(err))
                             deletion_list.append(key)
                             log.error(
                                 "Fatal exception thrown from session %s: %s"
@@ -215,6 +220,8 @@ class TftpServer(TftpSession):
                             except TftpTimeoutExpectACK:
                                 self.sessions[key].timeout_expectACK = True
                             except TftpException as err:
+                                self.sessions[key].failed = True
+                                self.sessions[key].emit_event("error", error=str(err))
                                 deletion_list.append(key)
                                 log.error(
                                     "Fatal exception thrown from session %s: %s"
@@ -238,6 +245,8 @@ class TftpServer(TftpSession):
                         log.debug(
                             "hit max retries on %s, giving up" % self.sessions[key]
                         )
+                        self.sessions[key].failed = True
+                        self.sessions[key].emit_event("error", error=str(err))
                         deletion_list.append(key)
                     else:
                         log.debug("resending on session %s" % self.sessions[key])

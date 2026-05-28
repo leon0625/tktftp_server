@@ -119,6 +119,11 @@ class TftpState:
             self.context.metrics.last_dat_time = time.time()
         if self.context.packethook:
             self.context.packethook(dat)
+        self.context.emit_event(
+            "progress",
+            bytes_done=self.context.metrics.bytes,
+            bytes_total=self.context.total_size,
+        )
         self.context.last_pkt = dat
         return finished
 
@@ -198,6 +203,11 @@ class TftpState:
             log.debug("Writing %d bytes to output file", len(pkt.data))
             self.context.fileobj.write(pkt.data)
             self.context.metrics.bytes += len(pkt.data)
+            self.context.emit_event(
+                "progress",
+                bytes_done=self.context.metrics.bytes,
+                bytes_total=self.context.total_size,
+            )
             # Check for end-of-file, any less than full data packet.
             if len(pkt.data) < self.context.getBlocksize():
                 log.info("End of file detected")
@@ -319,11 +329,12 @@ class TftpStateServerRecvRRQ(TftpServerState):
         sendoack = self.serverInitial(pkt, raddress, rport)
         path = self.full_path
         log.info("Opening file %s for reading" % path)
-        relpath = os.path.relpath(path, start=self.context.root) # relative path
-        mylog.info(f"{raddress}:{rport} GET {relpath}")
+        mylog.info(f"{raddress}:{rport} GET {path}")
+        self.context.direction = "send"
         if os.path.exists(path):
             # Note: Open in binary mode for win32 portability, since win32
             # blows.
+            self.context.total_size = os.path.getsize(path)
             self.context.fileobj = open(path, "rb")
         elif self.context.dyn_file_func:
             log.debug("No such file %s but using dyn_file_func", path)
@@ -337,9 +348,23 @@ class TftpStateServerRecvRRQ(TftpServerState):
                 raise TftpException("File not found: %s" % path)
         else:
             log.warning("File not found: %s", path)
-            mylog.warning("File not found: %s", relpath)
+            mylog.warning("File not found: %s", path)
+            self.context.emit_event(
+                "error",
+                direction="send",
+                file_name=self.context.file_to_transfer,
+                error=f"File not found: {path}",
+            )
             self.sendError(TftpErrors.FileNotFound)
             raise TftpException(f"File not found: {path}")
+
+        self.context.emit_event(
+            "start",
+            direction="send",
+            file_name=self.context.file_to_transfer,
+            path=path,
+            bytes_total=self.context.total_size,
+        )
 
         # Options negotiation.
         if sendoack and "tsize" in self.context.options:
@@ -395,8 +420,10 @@ class TftpStateServerRecvWRQ(TftpServerState):
     def handle(self, pkt, raddress, rport):
         """Handle an initial WRQ packet as a server."""
         log.debug("In TftpStateServerRecvWRQ.handle")
+        requested_tsize = pkt.options.get("tsize") if pkt.options else None
         sendoack = self.serverInitial(pkt, raddress, rport)
         path = self.full_path
+        self.context.direction = "receive"
         if self.context.upload_open:
             f = self.context.upload_open(path, self.context)
             if f is None:
@@ -419,6 +446,20 @@ class TftpStateServerRecvWRQ(TftpServerState):
             # the existing file until the file is successfully uploaded.
             self.make_subdirs()
             self.context.fileobj = open(path, "wb")
+
+        tsize = requested_tsize or self.context.options.get("tsize")
+        if tsize not in (None, "0"):
+            try:
+                self.context.total_size = int(tsize)
+            except (TypeError, ValueError):
+                self.context.total_size = None
+        self.context.emit_event(
+            "start",
+            direction="receive",
+            file_name=self.context.file_to_transfer,
+            path=path,
+            bytes_total=self.context.total_size,
+        )
 
         # Options negotiation.
         if sendoack:

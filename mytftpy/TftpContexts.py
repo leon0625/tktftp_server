@@ -49,6 +49,7 @@ class TftpMetrics:
         self.kbps = 0
         # Generic errors
         self.errors = 0
+        self.total_size = None
 
     def compute(self):
         # Compute transfer time
@@ -116,6 +117,48 @@ class TftpContext:
         # Flag to signal timeout error when waiting for ACK of the current block
         # and at the same time receiving duplicate ACK of previous block
         self.timeout_expectACK = False
+        self.cb = cb
+        self.transfer_id = f"{host}:{port}:{int(time.time() * 1000)}"
+        self.direction = None
+        self.total_size = None
+        self.failed = False
+        self._last_progress_percent = -1
+        self._last_progress_time = 0
+
+    def emit_event(self, event, **data):
+        """Send structured transfer events while keeping legacy callbacks usable."""
+        if not self.cb:
+            return
+        now = time.time()
+        if event == "progress":
+            bytes_done = int(data.get("bytes_done", self.metrics.bytes) or 0)
+            bytes_total = data.get("bytes_total", self.total_size)
+            if bytes_total:
+                percent = int(bytes_done * 100 / int(bytes_total))
+                if percent == self._last_progress_percent and now - self._last_progress_time < 0.1:
+                    return
+                self._last_progress_percent = percent
+            elif now - self._last_progress_time < 0.1:
+                return
+            self._last_progress_time = now
+        payload = {
+            "event": event,
+            "id": self.transfer_id,
+            "host": self.host,
+            "port": self.port,
+            "peer": f"{self.host}:{self.port}",
+            "direction": self.direction,
+            "file_name": self.file_to_transfer,
+            "bytes_done": self.metrics.bytes,
+            "bytes_total": self.total_size,
+            "started_at": self.metrics.start_time,
+            "updated_at": now,
+        }
+        payload.update(data)
+        try:
+            self.cb(payload)
+        except TypeError:
+            self.cb(event)
 
     def getBlocksize(self):
         """Fetch the current blocksize for this session."""
@@ -238,7 +281,7 @@ class TftpContextServer(TftpContext):
         retries=DEF_TIMEOUT_RETRIES,
         cb=None,
     ):
-        TftpContext.__init__(self, host, port, timeout, retries)
+        TftpContext.__init__(self, host, port, timeout, retries, cb=cb)
         # At this point we have no idea if this is a download or an upload. We
         # need to let the start state determine that.
         self.state = TftpStateServerStart(self)
@@ -246,8 +289,6 @@ class TftpContextServer(TftpContext):
         self.root = root
         self.dyn_file_func = dyn_file_func
         self.upload_open = upload_open
-        self.cb = cb
-
     def __str__(self):
         return f"{self.host}:{self.port} {self.state}"
 
@@ -263,8 +304,7 @@ class TftpContextServer(TftpContext):
         log.debug("Set metrics.start_time to %s", self.metrics.start_time)
         # And update our last updated time.
         self.last_update = time.time()
-        if self.cb:
-            self.cb('start')
+        self.emit_event("start")
 
         pkt = self.factory.parse(buffer)
         log.debug("TftpContextServer.start() - factory returned a %s", pkt)
@@ -280,6 +320,14 @@ class TftpContextServer(TftpContext):
         log.debug("Set metrics.end_time to %s", self.metrics.end_time)
         log.debug("Detected dups in transfer: %d", self.metrics.dupcount)
         self.metrics.compute()
+        if not self.failed:
+            self.emit_event(
+                "complete",
+                bytes_done=self.metrics.bytes,
+                bytes_total=self.total_size,
+                duration=self.metrics.duration,
+                kbps=self.metrics.kbps,
+            )
 
 
 class TftpContextClientUpload(TftpContext):
