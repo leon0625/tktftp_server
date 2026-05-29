@@ -232,12 +232,17 @@ func (a *App) StartClientTransfer(req ClientTransferRequest) error {
 }
 
 func (a *App) handleServerRead(filename string, rf io.ReaderFrom) error {
+	peer := transferPeer(rf)
+	id := a.addTransfer(filename, "Sending", "Sending", peer, 0)
+
 	path, err := safeJoin(a.rootDir, filename)
 	if err != nil {
+		a.finishTransfer(id, "Failed", err)
 		return err
 	}
 	file, err := os.Open(path)
 	if err != nil {
+		a.finishTransfer(id, "Failed", err)
 		return err
 	}
 	defer file.Close()
@@ -249,8 +254,7 @@ func (a *App) handleServerRead(filename string, rf io.ReaderFrom) error {
 	if outgoing, ok := rf.(tftp.OutgoingTransfer); ok && total > 0 {
 		outgoing.SetSize(total)
 	}
-	peer := transferPeer(rf)
-	id := a.addTransfer(filename, "Sending", "Sending", peer, total)
+	a.updateTransferProgress(id, 0, total)
 	reader := &progressReader{
 		reader: file,
 		onProgress: func(done int64) {

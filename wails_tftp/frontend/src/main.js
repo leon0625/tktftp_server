@@ -1,4 +1,5 @@
 import './style.css';
+import appIcon from './assets/images/appicon.png';
 import {
   BrowseLocalFile,
   BrowseRoot,
@@ -9,7 +10,13 @@ import {
   StartServer,
   StopServer,
 } from '../wailsjs/go/main/App';
-import { EventsOn } from '../wailsjs/runtime/runtime';
+import {
+  EventsOn,
+  Quit,
+  WindowIsMaximised,
+  WindowMinimise,
+  WindowToggleMaximise,
+} from '../wailsjs/runtime/runtime';
 
 const app = document.querySelector('#app');
 
@@ -25,8 +32,39 @@ let state = {
   counts: { total: 0, completed: 0, inProgress: 0, failed: 0 },
 };
 
+const trashIcon = `
+  <svg class="icon-svg trash-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 7h16" />
+    <path d="M9 7V4h6v3" />
+    <path d="M7 7l1 13h8l1-13" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+  </svg>
+`;
+
+const pcIcon = `
+  <svg class="icon-svg pc-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="4" y="5" width="16" height="11" rx="1.6" />
+    <path d="M10 19h4" />
+    <path d="M12 16v3" />
+    <path d="M7 16h10" />
+  </svg>
+`;
+
 app.innerHTML = `
   <main class="window">
+    <header class="titlebar">
+      <div class="titlebar-brand">
+        <img src="${appIcon}" alt="" />
+        <span>TFTP Tool</span>
+      </div>
+      <div class="titlebar-drag"></div>
+      <div class="window-controls">
+        <button id="window-minimise" class="window-button" title="Minimize">−</button>
+        <button id="window-maximise" class="window-button" title="Maximize">□</button>
+        <button id="window-close" class="window-button close" title="Close">×</button>
+      </div>
+    </header>
     <section class="content">
       <div class="main-grid">
         <section class="panel server">
@@ -59,12 +97,12 @@ app.innerHTML = `
               <table>
                 <thead>
                   <tr>
-                    <th style="width:22%">File Name</th>
-                    <th style="width:12%">Status</th>
-                    <th style="width:19%">Progress</th>
-                    <th style="width:22%">Peer IP:Port</th>
-                    <th style="width:11%">Size</th>
-                    <th style="width:14%">Speed</th>
+                    <th class="file-col">File Name</th>
+                    <th class="status-col">Status</th>
+                    <th class="progress-col">Progress</th>
+                    <th class="peer-col">Peer</th>
+                    <th class="size-col">Size</th>
+                    <th class="speed-col">Speed</th>
                   </tr>
                 </thead>
                 <tbody id="transfer-body"></tbody>
@@ -72,14 +110,14 @@ app.innerHTML = `
             </div>
 
             <div class="server-actions">
-              <button id="clear-history" class="clear-btn"><span class="trash">▥</span>Clear History</button>
+              <button id="clear-history" class="clear-btn">${trashIcon}Clear History</button>
             </div>
           </fieldset>
         </section>
 
         <section class="panel client">
           <div class="panel-title">
-            <div class="circle-icon">▱</div>
+            <div class="circle-icon">${pcIcon}</div>
             <span>TFTP Client</span>
           </div>
 
@@ -147,11 +185,21 @@ const remoteFile = $('#remote-file');
 const transferBody = $('#transfer-body');
 const rootHistoryMenu = $('#root-history-menu');
 const toast = $('#toast');
+const maximiseButton = $('#window-maximise');
+
+$('#window-minimise').addEventListener('click', () => WindowMinimise());
+maximiseButton.addEventListener('click', () => toggleMaximise());
+$('#window-close').addEventListener('click', () => Quit());
+$('.titlebar').addEventListener('dblclick', (event) => {
+  if (event.target.closest('.window-controls')) return;
+  toggleMaximise();
+});
 
 $('#browse-root').addEventListener('click', async () => {
   const dir = await BrowseRoot();
   if (!dir) return;
   rootDir.value = dir;
+  syncInputTitles();
   await applyRootDirectory();
 });
 
@@ -168,6 +216,7 @@ $('#browse-local').addEventListener('click', async () => {
   const file = await BrowseLocalFile();
   if (!file) return;
   localFile.value = file;
+  syncInputTitles();
 });
 
 $('#get-file').addEventListener('click', async () => {
@@ -194,6 +243,7 @@ rootDir.addEventListener('keydown', (event) => {
   }
 });
 rootDir.addEventListener('change', applyRootDirectory);
+rootDir.addEventListener('input', syncInputTitles);
 rootDir.addEventListener('blur', () => {
   window.setTimeout(() => {
     if (!document.activeElement?.closest?.('.root-picker')) applyRootDirectory();
@@ -204,6 +254,9 @@ rootDir.addEventListener('focus', () => {
 });
 document.addEventListener('click', (event) => {
   if (!event.target.closest('.root-picker')) hideRootHistory();
+});
+[serverIP, port, localFile, remoteFile].forEach((input) => {
+  input.addEventListener('input', syncInputTitles);
 });
 
 async function applyRootDirectory() {
@@ -261,6 +314,7 @@ function render(nextState) {
   renderRootHistory();
   serverIP.value = serverIP.value || state.serverIP || '127.0.0.1';
   port.value = port.value || String(state.port || 69);
+  syncInputTitles();
   $('#server-status').textContent = state.serverStatus || 'Stopped';
   $('#server-status').className = statusClass(state.serverStatus);
   const isRunning = state.serverStatus === 'Running' || state.serverStatus === 'Starting';
@@ -274,19 +328,25 @@ function render(nextState) {
   } else {
     for (const record of transfers) {
       const percent = progressPercent(record);
+      const status = displayStatus(record);
+      const peer = peerHost(record.peer || '');
+      const size = formatBytes(record.bytesTotal || record.bytesDone);
+      const speed = formatSpeed(record);
       const row = document.createElement('tr');
       row.innerHTML = `
         <td title="${escapeHtml(record.fileName || '')}">${escapeHtml(baseName(record.fileName || ''))}</td>
-        <td class="${statusClass(record.status)}">${escapeHtml(record.status || '')}</td>
-        <td>
+        <td class="${statusClass(record.status)}" title="${escapeHtml(status)}">${escapeHtml(status)}</td>
+        <td title="${percent}%">
           <div class="progress-cell">
-            <div class="mini-progress"><div class="bar" style="width:${percent}%"></div></div>
-            <span>${percent}%</span>
+            <div class="mini-progress">
+              <div class="bar" style="width:${percent}%"></div>
+              <span>${percent}%</span>
+            </div>
           </div>
         </td>
-        <td>${escapeHtml(record.peer || '')}</td>
-        <td>${formatBytes(record.bytesTotal || record.bytesDone)}</td>
-        <td>${formatSpeed(record)}</td>
+        <td title="${escapeHtml(record.peer || '')}">${escapeHtml(peer)}</td>
+        <td title="${escapeHtml(size)}">${escapeHtml(size)}</td>
+        <td title="${escapeHtml(speed)}">${escapeHtml(speed)}</td>
       `;
       transferBody.appendChild(row);
     }
@@ -311,6 +371,7 @@ function renderRootHistory() {
     option.title = item;
     option.addEventListener('click', async () => {
       rootDir.value = item;
+      syncInputTitles();
       hideRootHistory();
       await applyRootDirectory();
     });
@@ -344,17 +405,24 @@ function renderClientDetails(record) {
     $('#client-speed').textContent = '0 B/s';
     $('#client-elapsed').textContent = '00:00:00';
     $('#client-estimated').textContent = '00:00:00';
+    $('#client-status').title = 'Idle';
+    $('#client-transferred').title = '0 B / 0 B';
+    $('#client-speed').title = '0 B/s';
+    $('#client-elapsed').title = '00:00:00';
+    $('#client-estimated').title = '00:00:00';
     return;
   }
   const percent = progressPercent(record);
-  $('#client-status').textContent = record.status || 'Idle';
+  const status = displayStatus(record);
+  renderClientStatus(record, status, percent);
+  $('#client-status').title = status;
   $('#client-status').className = `active ${statusClass(record.status)}`;
   $('#client-progress-bar').style.width = `${percent}%`;
   $('#client-progress-text').textContent = `${percent}%`;
-  $('#client-transferred').textContent = `${formatBytes(record.bytesDone)} / ${formatBytes(record.bytesTotal)}`;
-  $('#client-speed').textContent = formatSpeed(record);
-  $('#client-elapsed').textContent = formatDuration(elapsedSeconds(record));
-  $('#client-estimated').textContent = estimateRemaining(record);
+  setTextAndTitle($('#client-transferred'), `${formatBytes(record.bytesDone)} / ${formatBytes(record.bytesTotal)}`);
+  setTextAndTitle($('#client-speed'), formatSpeed(record));
+  setTextAndTitle($('#client-elapsed'), formatDuration(elapsedSeconds(record)));
+  setTextAndTitle($('#client-estimated'), estimateRemaining(record));
 }
 
 function renderFooter() {
@@ -420,6 +488,58 @@ function statusClass(status) {
   return 'blue-text';
 }
 
+function renderClientStatus(record, status, percent) {
+  const statusElement = $('#client-status');
+  if (isTransferInProgress(record.status)) {
+    statusElement.innerHTML = `
+      <div class="client-status-progress">
+        <span>${escapeHtml(status)}</span>
+        <div class="client-status-bar">
+          <div class="bar" style="width:${percent}%"></div>
+          <span>${percent}%</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  statusElement.textContent = status;
+}
+
+function isTransferInProgress(status) {
+  return status === 'Sending' || status === 'Receiving' || status === 'Transferring';
+}
+
+function displayStatus(record) {
+  if (!record) return 'Idle';
+  const status = record.status || 'Idle';
+  if (status === 'Completed') {
+    return isReceiveDirection(record.direction) ? 'Recv Done' : 'Send Done';
+  }
+  if (status === 'Failed' && record.error) {
+    return `${status}: ${record.error}`;
+  }
+  return status;
+}
+
+function isReceiveDirection(direction) {
+  const value = String(direction || '').toLowerCase();
+  return value === 'receiving' || value === 'recv' || value === 'get';
+}
+
+function peerHost(peer) {
+  const value = String(peer || '').trim();
+  if (!value) return '';
+  if (value.startsWith('[')) {
+    const end = value.indexOf(']');
+    return end > 0 ? value.slice(1, end) : value;
+  }
+  const lastColon = value.lastIndexOf(':');
+  if (lastColon > -1 && value.indexOf(':') === lastColon) {
+    return value.slice(0, lastColon);
+  }
+  return value;
+}
+
 function baseName(path) {
   return path.split(/[\\/]/).pop() || path;
 }
@@ -431,6 +551,17 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function setTextAndTitle(element, value) {
+  element.textContent = value;
+  element.title = value;
+}
+
+function syncInputTitles() {
+  [rootDir, serverIP, port, localFile, remoteFile].forEach((input) => {
+    input.title = input.value || '';
+  });
 }
 
 let toastTimer;
@@ -446,3 +577,19 @@ EventsOn('state', render);
 EventsOn('app-error', showError);
 
 GetInitialState().then(render).catch(showError);
+syncMaximiseButton();
+
+async function toggleMaximise() {
+  WindowToggleMaximise();
+  window.setTimeout(syncMaximiseButton, 80);
+}
+
+async function syncMaximiseButton() {
+  try {
+    const maximised = await WindowIsMaximised();
+    maximiseButton.textContent = maximised ? '❐' : '□';
+    maximiseButton.title = maximised ? 'Restore' : 'Maximize';
+  } catch (_error) {
+    maximiseButton.textContent = '□';
+  }
+}
