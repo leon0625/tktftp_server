@@ -1,10 +1,10 @@
 [Desktop Entry]
-Name=TFTP server 
+Name=TFTP Tool 
 Comment=测试工具
 Type=Application
-Path=/APP/tktftp
-Exec=pkexec /APP/tktftp/tktftp
-Icon=/APP/tktftp/icon.png
+Path=/APP/wails_tftp
+Exec=/APP/wails_tftp/wails_tftp
+Icon=/APP/wails_tftp/icon.png
 Terminal=false
 # 修复24.04图标不显示问题
 StartupWMClass=tftp

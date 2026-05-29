@@ -24,7 +24,7 @@ let state = {
   rootDirectory: '',
   rootHistory: [],
   listenIP: '0.0.0.0',
-  serverIP: '0.0.0.0',
+  serverIP: '192.168.1.10',
   port: 69,
   serverStatus: 'Stopped',
   transfers: [],
@@ -312,7 +312,7 @@ function render(nextState) {
     rootDir.value = state.rootDirectory || '';
   }
   renderRootHistory();
-  serverIP.value = serverIP.value || state.serverIP || '127.0.0.1';
+  serverIP.value = serverIP.value || state.serverIP || '192.168.1.10';
   port.value = port.value || String(state.port || 69);
   syncInputTitles();
   $('#server-status').textContent = state.serverStatus || 'Stopped';

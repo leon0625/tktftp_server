@@ -20,6 +20,7 @@ import (
 
 const listenPort = 69
 const maxRootHistory = 20
+const defaultClientServerIP = "192.168.1.10"
 
 type TransferRecord struct {
 	ID         string `json:"id"`
@@ -66,6 +67,7 @@ type App struct {
 	mu             sync.Mutex
 	rootDir        string
 	rootHistory    []string
+	clientServerIP string
 	server         *tftp.Server
 	serverStatus   string
 	transfers      map[string]*TransferRecord
@@ -84,11 +86,12 @@ func NewApp() *App {
 		cwd = history[0]
 	}
 	return &App{
-		rootDir:      cwd,
-		rootHistory:  ensureHistoryPath(history, cwd),
-		serverStatus: "Stopped",
-		transfers:    map[string]*TransferRecord{},
-		uploadSizes:  map[string]int64{},
+		rootDir:        cwd,
+		rootHistory:    ensureHistoryPath(history, cwd),
+		clientServerIP: loadClientServerIP(),
+		serverStatus:   "Stopped",
+		transfers:      map[string]*TransferRecord{},
+		uploadSizes:    map[string]int64{},
 	}
 }
 
@@ -227,6 +230,7 @@ func (a *App) StartClientTransfer(req ClientTransferRequest) error {
 	if req.Action == "put" && req.RemoteFile == "" {
 		req.RemoteFile = filepath.Base(req.LocalFile)
 	}
+	a.setClientServerIP(req.Host)
 	go a.runClientTransfer(req)
 	return nil
 }
@@ -579,7 +583,7 @@ func (a *App) snapshot() AppState {
 		RootDirectory:  a.rootDir,
 		RootHistory:    rootHistory,
 		ListenIP:       "0.0.0.0",
-		ServerIP:       localIP(),
+		ServerIP:       a.clientServerIP,
 		Port:           listenPort,
 		ServerStatus:   a.serverStatus,
 		Transfers:      transfers,
@@ -600,6 +604,18 @@ func (a *App) emitError(message string) {
 		return
 	}
 	runtime.EventsEmit(a.ctx, "app-error", message)
+}
+
+func (a *App) setClientServerIP(serverIP string) {
+	serverIP = strings.TrimSpace(serverIP)
+	if serverIP == "" {
+		return
+	}
+	a.mu.Lock()
+	a.clientServerIP = serverIP
+	a.mu.Unlock()
+	saveClientServerIP(serverIP)
+	a.emitState()
 }
 
 func (a *App) setUploadSize(name string, size int64) {
@@ -753,18 +769,6 @@ func isLocalIP(ip net.IP) bool {
 	return false
 }
 
-func localIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return "127.0.0.1"
-	}
-	defer conn.Close()
-	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
-		return addr.IP.String()
-	}
-	return "127.0.0.1"
-}
-
 func historyFilePath() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -773,6 +777,48 @@ func historyFilePath() string {
 	dir := filepath.Join(configDir, "wails_tftp")
 	_ = os.MkdirAll(dir, 0755)
 	return filepath.Join(dir, "history.json")
+}
+
+func settingsFilePath() string {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "wails_tftp_settings.json"
+	}
+	dir := filepath.Join(configDir, "wails_tftp")
+	_ = os.MkdirAll(dir, 0755)
+	return filepath.Join(dir, "settings.json")
+}
+
+type appSettings struct {
+	ClientServerIP string `json:"clientServerIP"`
+}
+
+func loadClientServerIP() string {
+	data, err := os.ReadFile(settingsFilePath())
+	if err != nil {
+		return defaultClientServerIP
+	}
+	var settings appSettings
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return defaultClientServerIP
+	}
+	serverIP := strings.TrimSpace(settings.ClientServerIP)
+	if serverIP == "" {
+		return defaultClientServerIP
+	}
+	return serverIP
+}
+
+func saveClientServerIP(serverIP string) {
+	serverIP = strings.TrimSpace(serverIP)
+	if serverIP == "" {
+		return
+	}
+	data, err := json.MarshalIndent(appSettings{ClientServerIP: serverIP}, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(settingsFilePath(), data, 0644)
 }
 
 func loadRootHistory() []string {

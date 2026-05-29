@@ -1,11 +1,11 @@
 #!/bin/bash
-INSTALL_DIR=/APP/tktftp
-sudo ls
-rm -rf dist build
-pyinstaller -F tktftp.py --add-data 'icon.png:.' --hidden-import=PIL._tkinter_finder
-sudo mkdir -p /APP/tktftp
-sudo cp dist/tktftp $INSTALL_DIR/
+
+set -e
+
+INSTALL_DIR=/APP/wails_tftp
+sudo mkdir -p $INSTALL_DIR/
+sudo cp wails_tftp/build/bin/wails_tftp $INSTALL_DIR/
+sudo sudo setcap cap_net_bind_service=+ep $INSTALL_DIR/wails_tftp
 sudo cp icon.png $INSTALL_DIR/
-sudo cp tktftp.desktop /usr/local/share/applications/
-sudo cp tktftp.policy /usr/share/polkit-1/actions/
- 
+sudo cp wails_tftp.desktop /usr/local/share/applications/
+echo finish
