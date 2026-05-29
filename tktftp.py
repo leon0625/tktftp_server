@@ -40,10 +40,10 @@ COLORS = {
     "field_border": "#c6cbd2",
 }
 
-FONT = ("Segoe UI", 11)
-FONT_SMALL = ("Segoe UI", 10)
-FONT_TITLE = ("Segoe UI", 14, "bold")
-FONT_BUTTON = ("Segoe UI", 12, "bold")
+FONT = ("Segoe UI", 10)
+FONT_SMALL = ("Segoe UI", 9)
+FONT_TITLE = ("Segoe UI", 12, "bold")
+FONT_BUTTON = ("Segoe UI", 10, "bold")
 
 
 def resource_path(name):
@@ -195,7 +195,7 @@ class TransferRecord:
 
 
 class ProgressBar(tk.Canvas):
-    def __init__(self, master, height=28, compact=False, **kwargs):
+    def __init__(self, master, height=24, compact=False, **kwargs):
         super().__init__(
             master,
             height=height,
@@ -250,7 +250,7 @@ class ProgressBar(tk.Canvas):
 
 
 class GradientButton(tk.Canvas):
-    def __init__(self, master, text, icon, command, top, bottom, width=210, height=56):
+    def __init__(self, master, text, icon, command, top, bottom, width=180, height=44):
         super().__init__(
             master,
             width=width,
@@ -311,7 +311,7 @@ class GradientButton(tk.Canvas):
 
 
 class ModernButton(tk.Canvas):
-    def __init__(self, master, text, command, icon=None, width=140, height=48):
+    def __init__(self, master, text, command, icon=None, width=120, height=40):
         super().__init__(
             master,
             width=width,
@@ -375,8 +375,8 @@ class TransferTable(tk.Frame):
         ("Size", 0.12),
         ("Speed", 0.15),
     ]
-    HEADER_HEIGHT = 48
-    ROW_HEIGHT = 56
+    HEADER_HEIGHT = 36
+    ROW_HEIGHT = 42
 
     def __init__(self, master):
         super().__init__(master, bg=COLORS["panel"], highlightbackground=COLORS["border"], highlightthickness=1)
@@ -513,12 +513,12 @@ class TFTPToolApp:
     def setup_window(self):
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        width = min(1536, max(1180, screen_width - 80))
-        height = min(1024, max(760, screen_height - 80))
+        width = max(860, screen_width // 2)
+        height = max(520, screen_height // 2)
         x = max(0, int((self.root.winfo_screenwidth() - width) / 2))
         y = max(0, int((self.root.winfo_screenheight() - height) / 2))
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-        self.root.minsize(1180, 720)
+        self.root.minsize(860, 520)
         icon_path = resource_path("icon.png")
         if os.path.exists(icon_path):
             self._app_icon = ImageTk.PhotoImage(Image.open(icon_path))
@@ -533,43 +533,43 @@ class TFTPToolApp:
         style.configure("TFrame", background=COLORS["bg"])
         style.configure("Panel.TFrame", background=COLORS["panel"])
         style.configure("TLabel", background=COLORS["panel"], foreground=COLORS["text"], font=FONT)
-        style.configure("TButton", font=FONT, padding=(18, 9), background="#ffffff", relief="raised")
-        style.configure("TEntry", fieldbackground=COLORS["field"], bordercolor=COLORS["field_border"], padding=6)
-        style.configure("TCombobox", fieldbackground=COLORS["field"], bordercolor=COLORS["blue"], padding=6)
+        style.configure("TButton", font=FONT, padding=(12, 6), background="#ffffff", relief="raised")
+        style.configure("TEntry", fieldbackground=COLORS["field"], bordercolor=COLORS["field_border"], padding=4)
+        style.configure("TCombobox", fieldbackground=COLORS["field"], bordercolor=COLORS["blue"], padding=4)
         style.configure("Vertical.TScrollbar", background="#f0f0f0", troughcolor="#fafafa")
         style.configure("Panel.TLabelframe", background=COLORS["panel"], bordercolor=COLORS["border"], relief="solid")
         style.configure("Panel.TLabelframe.Label", background=COLORS["panel"], foreground=COLORS["blue"], font=FONT_TITLE)
 
     def setup_icons(self):
         self.icons = {
-            "server": make_icon("server", COLORS["blue"], 28),
-            "monitor": make_icon("monitor", COLORS["blue"], 30),
-            "download": make_icon("download", "#ffffff", 28),
-            "upload": make_icon("upload", "#ffffff", 28),
-            "download_blue": make_icon("download", COLORS["blue"], 28),
-            "upload_blue": make_icon("upload", COLORS["blue"], 28),
-            "trash": make_icon("trash", COLORS["blue"], 22),
-            "cancel": make_icon("cancel", COLORS["blue"], 24),
-            "globe": make_icon("monitor", COLORS["blue"], 22),
-            "port": make_icon("server", COLORS["blue"], 22),
-            "swap": make_icon("download", COLORS["blue"], 22),
-            "ok": make_icon("cancel", COLORS["green"], 22),
-            "fail": make_icon("cancel", COLORS["red"], 22),
+            "server": make_icon("server", COLORS["blue"], 24),
+            "monitor": make_icon("monitor", COLORS["blue"], 24),
+            "download": make_icon("download", "#ffffff", 24),
+            "upload": make_icon("upload", "#ffffff", 24),
+            "download_blue": make_icon("download", COLORS["blue"], 22),
+            "upload_blue": make_icon("upload", COLORS["blue"], 22),
+            "trash": make_icon("trash", COLORS["blue"], 18),
+            "cancel": make_icon("cancel", COLORS["blue"], 20),
+            "globe": make_icon("monitor", COLORS["blue"], 18),
+            "port": make_icon("server", COLORS["blue"], 18),
+            "swap": make_icon("download", COLORS["blue"], 18),
+            "ok": make_icon("cancel", COLORS["green"], 18),
+            "fail": make_icon("cancel", COLORS["red"], 18),
         }
 
     def setup_ui(self):
         container = tk.Frame(self.root, bg=COLORS["bg"])
-        container.pack(fill="both", expand=True, padx=18, pady=18)
+        container.pack(fill="both", expand=True, padx=10, pady=10)
         container.grid_columnconfigure(0, weight=3, uniform="main")
         container.grid_columnconfigure(1, weight=2, uniform="main")
         container.grid_rowconfigure(0, weight=1)
 
         self.server_panel = self.create_panel(container)
-        self.server_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.server_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
         self.client_panel = self.create_panel(container)
-        self.client_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
-        self.footer = self.create_panel(container, height=64)
-        self.footer.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(14, 0))
+        self.client_panel.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        self.footer = self.create_panel(container, height=48)
+        self.footer.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
 
         self.setup_server_panel()
         self.setup_client_panel()
@@ -584,7 +584,7 @@ class TFTPToolApp:
 
     def section_title(self, master, icon, text):
         frame = tk.Frame(master, bg=COLORS["panel"])
-        tk.Label(frame, image=icon, bg=COLORS["panel"]).pack(side="left", padx=(0, 14))
+        tk.Label(frame, image=icon, bg=COLORS["panel"]).pack(side="left", padx=(0, 8))
         tk.Label(frame, text=text, bg=COLORS["panel"], fg=COLORS["blue"], font=FONT_TITLE).pack(side="left")
         return frame
 
@@ -594,43 +594,43 @@ class TFTPToolApp:
 
     def setup_server_panel(self):
         self.server_panel.grid_columnconfigure(0, weight=1)
-        self.section_title(self.server_panel, self.icons["server"], "TFTP Server").grid(row=0, column=0, sticky="w", padx=28, pady=(18, 10))
+        self.section_title(self.server_panel, self.icons["server"], "TFTP Server").grid(row=0, column=0, sticky="w", padx=16, pady=(10, 6))
 
         config = ttk.LabelFrame(self.server_panel, text="  Server Configuration  ", style="Panel.TLabelframe")
-        config.grid(row=1, column=0, sticky="ew", padx=18, pady=(6, 16))
+        config.grid(row=1, column=0, sticky="ew", padx=10, pady=(4, 8))
         config.grid_columnconfigure(1, weight=1)
         config.grid_columnconfigure(3, weight=1)
 
-        tk.Label(config, text="Root Directory:", bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=0, column=0, sticky="w", padx=16, pady=(24, 14))
+        tk.Label(config, text="Root Directory:", bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=0, column=0, sticky="w", padx=10, pady=(14, 8))
         self.path_var = tk.StringVar(value=self.current_directory)
         self.path_combo = ttk.Combobox(config, textvariable=self.path_var, font=FONT)
-        self.path_combo.grid(row=0, column=1, columnspan=3, sticky="ew", padx=(0, 16), pady=(24, 14), ipady=6)
+        self.path_combo.grid(row=0, column=1, columnspan=3, sticky="ew", padx=(0, 10), pady=(14, 8), ipady=3)
         self.path_combo.bind("<<ComboboxSelected>>", self.on_path_change)
         self.path_combo.bind("<Button-1>", lambda event: self.path_combo.event_generate("<Down>"))
-        ModernButton(config, "Browse...", self.browse_root, width=154, height=50).grid(row=0, column=4, sticky="ew", padx=(0, 16), pady=(24, 14))
+        ModernButton(config, "Browse...", self.browse_root, width=112, height=36).grid(row=0, column=4, sticky="ew", padx=(0, 10), pady=(14, 8))
 
-        tk.Label(config, text="Status:", bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=1, column=0, sticky="w", padx=16, pady=(14, 24))
+        tk.Label(config, text="Status:", bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=1, column=0, sticky="w", padx=10, pady=(8, 14))
         self.server_status_var = tk.StringVar(value="Starting")
         self.server_status_label = tk.Label(config, textvariable=self.server_status_var, bg=COLORS["panel"], fg=COLORS["blue"], font=FONT_BUTTON)
-        self.server_status_label.grid(row=1, column=1, sticky="w", padx=(0, 16), pady=(14, 24))
+        self.server_status_label.grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(8, 14))
 
         transfers = ttk.LabelFrame(self.server_panel, text="  Transfer List  ", style="Panel.TLabelframe")
-        transfers.grid(row=2, column=0, sticky="nsew", padx=18, pady=(0, 14))
+        transfers.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
         transfers.grid_columnconfigure(0, weight=1)
         transfers.grid_rowconfigure(0, weight=1)
         self.server_panel.grid_rowconfigure(2, weight=1)
         self.table = TransferTable(transfers)
-        self.table.grid(row=0, column=0, sticky="nsew", padx=8, pady=(14, 10))
+        self.table.grid(row=0, column=0, sticky="nsew", padx=6, pady=(8, 6))
 
-        clear_button = ModernButton(transfers, "Clear History", self.clear_completed, icon=self.icons["trash"], width=216, height=56)
-        clear_button.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 14))
+        clear_button = ModernButton(transfers, "Clear History", self.clear_completed, icon=self.icons["trash"], width=150, height=38)
+        clear_button.grid(row=1, column=0, sticky="w", padx=8, pady=(0, 8))
 
     def setup_client_panel(self):
         self.client_panel.grid_columnconfigure(0, weight=1)
-        self.section_title(self.client_panel, self.icons["monitor"], "TFTP Client").grid(row=0, column=0, sticky="w", padx=22, pady=(16, 18))
+        self.section_title(self.client_panel, self.icons["monitor"], "TFTP Client").grid(row=0, column=0, sticky="w", padx=14, pady=(10, 10))
 
         form = tk.Frame(self.client_panel, bg=COLORS["panel"])
-        form.grid(row=1, column=0, sticky="ew", padx=22)
+        form.grid(row=1, column=0, sticky="ew", padx=14)
         form.grid_columnconfigure(1, weight=1)
 
         self.server_ip_var = tk.StringVar(value=local_ip())
@@ -644,22 +644,22 @@ class TFTPToolApp:
         self.form_entry(form, "Remote File:", self.remote_file_var, row=3)
 
         actions = tk.Frame(self.client_panel, bg=COLORS["panel"])
-        actions.grid(row=2, column=0, sticky="ew", padx=22, pady=(20, 22))
+        actions.grid(row=2, column=0, sticky="ew", padx=14, pady=(12, 14))
         actions.grid_columnconfigure(0, weight=1)
         actions.grid_columnconfigure(1, weight=1)
-        self.get_button = ModernButton(actions, "Get", self.start_get, icon=self.icons["download_blue"], width=240, height=54)
-        self.get_button.grid(row=0, column=0, sticky="ew", padx=(0, 14))
-        self.put_button = ModernButton(actions, "Put", self.start_put, icon=self.icons["upload_blue"], width=240, height=54)
-        self.put_button.grid(row=0, column=1, sticky="ew", padx=(14, 0))
+        self.get_button = ModernButton(actions, "Get", self.start_get, icon=self.icons["download_blue"], width=132, height=40)
+        self.get_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.put_button = ModernButton(actions, "Put", self.start_put, icon=self.icons["upload_blue"], width=132, height=40)
+        self.put_button.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
         progress_frame = tk.Frame(self.client_panel, bg=COLORS["panel"])
-        progress_frame.grid(row=3, column=0, sticky="ew", padx=22)
-        tk.Label(progress_frame, text="Progress", bg=COLORS["panel"], fg=COLORS["blue"], font=FONT_TITLE).pack(anchor="w", pady=(0, 14))
-        self.client_progress = ProgressBar(progress_frame, height=34)
+        progress_frame.grid(row=3, column=0, sticky="ew", padx=14)
+        tk.Label(progress_frame, text="Progress", bg=COLORS["panel"], fg=COLORS["blue"], font=FONT_TITLE).pack(anchor="w", pady=(0, 8))
+        self.client_progress = ProgressBar(progress_frame, height=24)
         self.client_progress.pack(fill="x")
 
         details = tk.Frame(self.client_panel, bg=COLORS["panel"])
-        details.grid(row=4, column=0, sticky="ew", padx=22, pady=(22, 0))
+        details.grid(row=4, column=0, sticky="ew", padx=14, pady=(12, 0))
         details.grid_columnconfigure(1, weight=1)
         self.client_status_var = tk.StringVar(value="Idle")
         self.client_mode_var = tk.StringVar(value="octet")
@@ -680,28 +680,28 @@ class TFTPToolApp:
             "Cancel",
             self.cancel_client_transfer,
             icon=self.icons["cancel"],
-            width=236,
-            height=56,
+            width=132,
+            height=40,
         )
-        self.cancel_button.grid(row=6, column=0, sticky="e", padx=26, pady=(0, 32))
+        self.cancel_button.grid(row=6, column=0, sticky="e", padx=14, pady=(0, 14))
         self.set_client_busy(False)
 
     def form_entry(self, master, label, variable, row, browse=False):
-        tk.Label(master, text=label, bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=row, column=0, sticky="w", pady=9)
+        tk.Label(master, text=label, bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=row, column=0, sticky="w", pady=5)
         entry = ttk.Entry(master, textvariable=variable, font=FONT)
-        entry.grid(row=row, column=1, sticky="ew", padx=(16, 12 if browse else 0), pady=9, ipady=7)
+        entry.grid(row=row, column=1, sticky="ew", padx=(10, 8 if browse else 0), pady=5, ipady=3)
         if browse:
-            ModernButton(master, "Browse...", self.browse_local_file, width=154, height=50).grid(row=row, column=2, sticky="ew", pady=9)
+            ModernButton(master, "Browse...", self.browse_local_file, width=112, height=36).grid(row=row, column=2, sticky="ew", pady=5)
 
     def form_port_entry(self, master, label, variable, row):
-        tk.Label(master, text=label, bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=row, column=0, sticky="w", pady=9)
+        tk.Label(master, text=label, bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=row, column=0, sticky="w", pady=5)
         entry = ttk.Entry(master, textvariable=variable, width=8, font=FONT)
-        entry.grid(row=row, column=1, sticky="w", padx=(16, 0), pady=9, ipady=7)
+        entry.grid(row=row, column=1, sticky="w", padx=(10, 0), pady=5, ipady=3)
 
     def detail_row(self, master, label, variable, row, color=None):
-        tk.Label(master, text=label, bg=COLORS["panel"], fg=COLORS["text"], font=FONT_SMALL).grid(row=row, column=0, sticky="w", pady=7)
+        tk.Label(master, text=label, bg=COLORS["panel"], fg=COLORS["text"], font=FONT_SMALL).grid(row=row, column=0, sticky="w", pady=4)
         value_label = tk.Label(master, textvariable=variable, bg=COLORS["panel"], fg=color or COLORS["text"], font=FONT_SMALL)
-        value_label.grid(row=row, column=1, sticky="w", padx=(54, 0), pady=7)
+        value_label.grid(row=row, column=1, sticky="w", padx=(28, 0), pady=4)
         return value_label
 
     def setup_footer(self):
@@ -719,12 +719,12 @@ class TFTPToolApp:
             self.footer.grid_columnconfigure(index, weight=1)
         for index, (label, value, role) in enumerate(items):
             cell = tk.Frame(self.footer, bg=COLORS["panel"])
-            cell.grid(row=0, column=index, sticky="nsew", pady=15)
+            cell.grid(row=0, column=index, sticky="nsew", pady=10)
             if index:
-                tk.Frame(cell, bg=COLORS["border"], width=1).pack(side="left", fill="y", padx=(0, 12))
+                tk.Frame(cell, bg=COLORS["border"], width=1).pack(side="left", fill="y", padx=(0, 8))
             icon_name = {"completed": "ok", "progress": "swap", "failed": "fail"}.get(role, role)
             if icon_name in self.icons:
-                tk.Label(cell, image=self.icons[icon_name], bg=COLORS["panel"]).pack(side="left", padx=(0, 8))
+                tk.Label(cell, image=self.icons[icon_name], bg=COLORS["panel"]).pack(side="left", padx=(0, 5))
             tk.Label(cell, text=label, bg=COLORS["panel"], fg=COLORS["text"], font=FONT_SMALL).pack(side="left")
             var = tk.StringVar(value=value)
             color = COLORS["text"]
@@ -734,7 +734,7 @@ class TFTPToolApp:
                 color = COLORS["blue"]
             elif role == "failed":
                 color = COLORS["red"]
-            tk.Label(cell, textvariable=var, bg=COLORS["panel"], fg=color, font=FONT_SMALL).pack(side="left", padx=(8, 10))
+            tk.Label(cell, textvariable=var, bg=COLORS["panel"], fg=color, font=FONT_SMALL).pack(side="left", padx=(5, 6))
             self.footer_values[label] = var
 
     def load_history(self):
