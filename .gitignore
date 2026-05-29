@@ -18,6 +18,8 @@ tags
 .DS_Store
 test.log
 tftpy.egg-info
+.build-venv/
+.tools/
 # PyCharm
 .idea/
 coverage.xml

@@ -50,16 +50,68 @@ def resource_path(name):
     return os.path.join(APPLICATION_PATH, name)
 
 
-def local_ip():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.connect(("8.8.8.8", 80))
-        return sock.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        sock.close()
+def current_monitor_area(root):
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+            from ctypes import wintypes
 
+            class POINT(ctypes.Structure):
+                _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+            class MONITORINFO(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", wintypes.DWORD),
+                    ("rcMonitor", wintypes.RECT),
+                    ("rcWork", wintypes.RECT),
+                    ("dwFlags", wintypes.DWORD),
+                ]
+
+            user32 = ctypes.windll.user32
+            user32.SetProcessDPIAware()
+
+            point = POINT()
+            user32.GetCursorPos(ctypes.byref(point))
+            monitor = user32.MonitorFromPoint(point, 2)
+            info = MONITORINFO()
+            info.cbSize = ctypes.sizeof(MONITORINFO)
+            if monitor and user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+                rect = info.rcWork
+                return rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
+        except Exception:
+            pass
+
+    if sys.platform.startswith("linux"):
+        try:
+            import re
+            import subprocess
+
+            pointer_x, pointer_y = root.winfo_pointerxy()
+            output = subprocess.check_output(
+                ["xrandr", "--listmonitors"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=1,
+            )
+            monitors = []
+            for line in output.splitlines()[1:]:
+                match = re.search(r"(\d+)/\d+x(\d+)/\d+([+-]\d+)([+-]\d+)", line)
+                if not match:
+                    continue
+                width, height, x, y = (int(value) for value in match.groups())
+                monitors.append((x, y, width, height))
+                if x <= pointer_x < x + width and y <= pointer_y < y + height:
+                    return x, y, width, height
+            if monitors:
+                return monitors[0]
+        except Exception:
+            pass
+
+    return 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
+
+
+def local_ip():
+    return "127.0.0.1"
 
 def format_bytes(value):
     if value is None:
@@ -500,29 +552,50 @@ class TFTPToolApp:
         self.records = {}
         self.client_record = None
         self.icons = {}
+        self.initial_width = 0
+        self.initial_height = 0
+        self.monitor_area = None
 
         self.setup_window()
         self.setup_styles()
         self.setup_icons()
         self.setup_ui()
         self.update_path_combo()
+        self.root.update_idletasks()
+        self.apply_initial_window_size()
+        self.root.after_idle(self.apply_initial_window_size)
         self.start_server(self.current_directory)
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.after(100, self.process_ui_queue)
 
     def setup_window(self):
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        width = max(860, screen_width // 2)
-        height = max(520, screen_height // 2)
-        x = max(0, int((self.root.winfo_screenwidth() - width) / 2))
-        y = max(0, int((self.root.winfo_screenheight() - height) / 2))
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
-        self.root.minsize(860, 520)
+        self.monitor_area = current_monitor_area(self.root)
+        _monitor_x, _monitor_y, monitor_width, monitor_height = self.monitor_area
+        self.initial_width = monitor_width // 2
+        self.initial_height = monitor_height // 2
+        self.root.minsize(min(640, self.initial_width), min(360, self.initial_height))
+        self.center_window(self.initial_width, self.initial_height)
         icon_path = resource_path("icon.png")
         if os.path.exists(icon_path):
             self._app_icon = ImageTk.PhotoImage(Image.open(icon_path))
             self.root.iconphoto(True, self._app_icon)
+
+    def center_window(self, width, height):
+        monitor_x, monitor_y, monitor_width, monitor_height = self.monitor_area or current_monitor_area(self.root)
+        x = monitor_x + max(0, int((monitor_width - width) / 2))
+        y = monitor_y + max(0, int((monitor_height - height) / 2))
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+
+    def apply_initial_window_size(self):
+        _monitor_x, _monitor_y, monitor_width, monitor_height = self.monitor_area or current_monitor_area(self.root)
+        max_width = max(320, monitor_width - 24)
+        max_height = max(240, monitor_height - 48)
+        min_width = min(max_width, max(640, self.root.winfo_reqwidth()))
+        min_height = min(max_height, max(420, self.root.winfo_reqheight()))
+        width = min(max_width, max(self.initial_width, min_width))
+        height = min(max_height, max(self.initial_height, min_height))
+        self.root.minsize(min_width, min_height)
+        self.center_window(width, height)
 
     def setup_styles(self):
         style = ttk.Style(self.root)
@@ -534,8 +607,40 @@ class TFTPToolApp:
         style.configure("Panel.TFrame", background=COLORS["panel"])
         style.configure("TLabel", background=COLORS["panel"], foreground=COLORS["text"], font=FONT)
         style.configure("TButton", font=FONT, padding=(12, 6), background="#ffffff", relief="raised")
-        style.configure("TEntry", fieldbackground=COLORS["field"], bordercolor=COLORS["field_border"], padding=4)
-        style.configure("TCombobox", fieldbackground=COLORS["field"], bordercolor=COLORS["blue"], padding=4)
+        style.configure(
+            "TEntry",
+            fieldbackground=COLORS["field"],
+            bordercolor=COLORS["field_border"],
+            lightcolor=COLORS["field_border"],
+            darkcolor=COLORS["field_border"],
+            borderwidth=1,
+            relief="solid",
+            padding=4,
+        )
+        style.map(
+            "TEntry",
+            bordercolor=[("focus", COLORS["blue_dark"]), ("active", COLORS["blue_dark"])],
+            lightcolor=[("focus", COLORS["blue_dark"]), ("active", COLORS["blue_dark"])],
+            darkcolor=[("focus", COLORS["blue_dark"]), ("active", COLORS["blue_dark"])],
+        )
+        style.configure(
+            "TCombobox",
+            fieldbackground=COLORS["field"],
+            bordercolor=COLORS["field_border"],
+            lightcolor=COLORS["field_border"],
+            darkcolor=COLORS["field_border"],
+            arrowcolor=COLORS["blue_dark"],
+            borderwidth=1,
+            relief="solid",
+            padding=4,
+        )
+        style.map(
+            "TCombobox",
+            bordercolor=[("focus", COLORS["blue_dark"]), ("active", COLORS["blue_dark"])],
+            lightcolor=[("focus", COLORS["blue_dark"]), ("active", COLORS["blue_dark"])],
+            darkcolor=[("focus", COLORS["blue_dark"]), ("active", COLORS["blue_dark"])],
+            arrowcolor=[("focus", COLORS["blue_dark"]), ("active", COLORS["blue_dark"])],
+        )
         style.configure("Vertical.TScrollbar", background="#f0f0f0", troughcolor="#fafafa")
         style.configure("Panel.TLabelframe", background=COLORS["panel"], bordercolor=COLORS["border"], relief="solid")
         style.configure("Panel.TLabelframe.Label", background=COLORS["panel"], foreground=COLORS["blue"], font=FONT_TITLE)
@@ -603,7 +708,7 @@ class TFTPToolApp:
 
         tk.Label(config, text="Root Directory:", bg=COLORS["panel"], fg=COLORS["text"], font=FONT).grid(row=0, column=0, sticky="w", padx=10, pady=(14, 8))
         self.path_var = tk.StringVar(value=self.current_directory)
-        self.path_combo = ttk.Combobox(config, textvariable=self.path_var, font=FONT)
+        self.path_combo = ttk.Combobox(config, textvariable=self.path_var, font=FONT, width=28)
         self.path_combo.grid(row=0, column=1, columnspan=3, sticky="ew", padx=(0, 10), pady=(14, 8), ipady=3)
         self.path_combo.bind("<<ComboboxSelected>>", self.on_path_change)
         self.path_combo.bind("<Button-1>", lambda event: self.path_combo.event_generate("<Down>"))
