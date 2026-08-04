@@ -21,6 +21,7 @@ import (
 const listenPort = 69
 const maxRootHistory = 20
 const defaultClientServerIP = "192.168.1.10"
+const emitInterval = 100 * time.Millisecond
 
 type TransferRecord struct {
 	ID         string `json:"id"`
@@ -74,6 +75,7 @@ type App struct {
 	clientTransfer *TransferRecord
 	uploadSizes    map[string]int64
 	nextID         int64
+	emitCh         chan struct{}
 }
 
 func NewApp() *App {
@@ -92,11 +94,13 @@ func NewApp() *App {
 		serverStatus:   "Stopped",
 		transfers:      map[string]*TransferRecord{},
 		uploadSizes:    map[string]int64{},
+		emitCh:         make(chan struct{}, 1),
 	}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	go a.emitLoop()
 	go func() {
 		time.Sleep(200 * time.Millisecond)
 		_ = a.StartServer(a.rootDir)
@@ -453,7 +457,7 @@ func (a *App) setClientTransfer(fileName, direction, status, peer string, total 
 		BytesTotal: total,
 		StartedAt:  time.Now().UnixMilli(),
 	}
-	go a.emitState()
+	a.notifyState()
 	return id
 }
 
@@ -467,7 +471,7 @@ func (a *App) updateClientProgress(id string, done int64, total int64) {
 		}
 	}
 	a.mu.Unlock()
-	a.emitState()
+	a.notifyState()
 }
 
 func (a *App) finishClientTransfer(id, status string, err error) {
@@ -504,7 +508,7 @@ func (a *App) addTransfer(fileName, direction, status, peer string, total int64)
 		BytesTotal: total,
 		StartedAt:  time.Now().UnixMilli(),
 	}
-	go a.emitState()
+	a.notifyState()
 	return id
 }
 
@@ -518,7 +522,7 @@ func (a *App) updateTransferProgress(id string, done int64, total int64) {
 		}
 	}
 	a.mu.Unlock()
-	a.emitState()
+	a.notifyState()
 }
 
 func (a *App) finishTransfer(id, status string, err error) {
@@ -597,6 +601,45 @@ func (a *App) emitState() {
 		return
 	}
 	runtime.EventsEmit(a.ctx, "state", a.snapshot())
+}
+
+// notifyState 标记状态有变化，由 emitLoop 节流后合并推送。
+// 高频进度更新（每个数据块一次）走这里，避免向前端全量推送快照造成卡顿。
+func (a *App) notifyState() {
+	if a.ctx == nil {
+		return
+	}
+	select {
+	case a.emitCh <- struct{}{}:
+	default:
+	}
+}
+
+// emitLoop 将高频的进度更新合并为低频（emitInterval）的状态推送，
+// 保证完成/失败等关键状态由 finishTransfer 等路径立即推送，这里只负责兜底。
+func (a *App) emitLoop() {
+	ticker := time.NewTicker(emitInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+		case <-a.ctx.Done():
+			return
+		}
+		select {
+		case <-a.emitCh:
+			// 排空累积的信号，只推送一次最新快照
+			for drained := false; !drained; {
+				select {
+				case <-a.emitCh:
+				default:
+					drained = true
+				}
+			}
+			a.emitState()
+		default:
+		}
+	}
 }
 
 func (a *App) emitError(message string) {

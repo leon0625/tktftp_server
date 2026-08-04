@@ -328,6 +328,10 @@ function render(nextState) {
   } else {
     for (const record of transfers) {
       const percent = progressPercent(record);
+      // 服务器接收上传时拿不到文件总大小（客户端未带 tsize），
+      // 此时进度条显示已传输字节数，完成时（Completed）仍显示 100%。
+      const hasTotal = record.bytesTotal > 0;
+      const progressLabel = hasTotal ? `${percent}%` : formatBytes(record.bytesDone);
       const status = displayStatus(record);
       const peer = peerHost(record.peer || '');
       const size = formatBytes(record.bytesTotal || record.bytesDone);
@@ -336,11 +340,11 @@ function render(nextState) {
       row.innerHTML = `
         <td title="${escapeHtml(record.fileName || '')}">${escapeHtml(baseName(record.fileName || ''))}</td>
         <td class="${statusClass(record.status)}" title="${escapeHtml(status)}">${escapeHtml(status)}</td>
-        <td title="${percent}%">
+        <td title="${escapeHtml(progressLabel)}">
           <div class="progress-cell">
             <div class="mini-progress">
-              <div class="bar" style="width:${percent}%"></div>
-              <span>${percent}%</span>
+              <div class="bar" style="width:${hasTotal ? percent : 0}%"></div>
+              <span>${escapeHtml(progressLabel)}</span>
             </div>
           </div>
         </td>
@@ -417,8 +421,11 @@ function renderClientDetails(record) {
   renderClientStatus(record, status, percent);
   $('#client-status').title = status;
   $('#client-status').className = `active ${statusClass(record.status)}`;
-  $('#client-progress-bar').style.width = `${percent}%`;
-  $('#client-progress-text').textContent = `${percent}%`;
+  // 总大小未知（服务器未支持 tsize）时显示已传输字节数
+  const hasTotal = record.bytesTotal > 0;
+  const progressText = hasTotal ? `${percent}%` : formatBytes(record.bytesDone);
+  $('#client-progress-bar').style.width = `${hasTotal ? percent : 0}%`;
+  $('#client-progress-text').textContent = progressText;
   setTextAndTitle($('#client-transferred'), `${formatBytes(record.bytesDone)} / ${formatBytes(record.bytesTotal)}`);
   setTextAndTitle($('#client-speed'), formatSpeed(record));
   setTextAndTitle($('#client-elapsed'), formatDuration(elapsedSeconds(record)));
